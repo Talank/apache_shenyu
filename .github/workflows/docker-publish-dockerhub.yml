@@ -16,10 +16,7 @@
 name: docker-publish-dockerhub
 
 on:
-  release:
-    # pre-release or draft status don't trigger this job.
-    # this job called if and only if pre-release -> release or release directly.
-    types: ["released"]
+  workflow_dispatch:
 
 env:
   REPOSITORY: ${{ github.repository }}
@@ -27,8 +24,8 @@ env:
 
 jobs:
   dockerhub:
-    runs-on: ubuntu-latest
-    if: (github.repository == 'apache/shenyu')
+    runs-on: ${{ matrix.os }}
+    if: always()
     permissions:
       contents: read
       packages: write
@@ -69,7 +66,8 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Maven
-        run: ./mvnw -B clean -Prelease -Dmaven.javadoc.skip=true -B -Drat.skip=true -Djacoco.skip=true -DskipITs -DskipTests package
+        run: ./mvnw -B clean -Prelease -Dmaven.javadoc.skip=true -B -Drat.skip=true -Djacoco.skip=true -DskipITs 
+          -DskipTests package
 
       - name: Build and push (admin) (dockerhub)
         uses: docker/build-push-action@v3
@@ -94,3 +92,10 @@ jobs:
           tags: |
             apache/shenyu-bootstrap:latest
             apache/shenyu-bootstrap:${{ env.TAG }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false

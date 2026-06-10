@@ -16,13 +16,7 @@
 name: docker-publish-ghcr
 
 on:
-  push:
-    branches: [ "master" ]
-    tags: [ 'v*.*.*' ]
-    paths-ignore:
-      - '**.md'
-      - '**/resources/static/'
-
+  workflow_dispatch:
 env:
   REGISTRY: ghcr.io
   REPOSITORY: ${{ github.repository }}
@@ -30,8 +24,8 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    if: (github.repository == 'apache/shenyu')
+    runs-on: ${{ matrix.os }}
+    if: always()
     permissions:
       contents: read
       packages: write
@@ -73,7 +67,8 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Maven
-        run: ./mvnw -B clean -Prelease -Dmaven.javadoc.skip=true -B -Drat.skip=true -Djacoco.skip=true -DskipITs -DskipTests package
+        run: ./mvnw -B clean -Prelease -Dmaven.javadoc.skip=true -B -Drat.skip=true -Djacoco.skip=true -DskipITs 
+          -DskipTests package
 
       - name: Build and push (admin) (ghcr.io)
         uses: docker/build-push-action@v3
@@ -98,3 +93,10 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/bootstrap:latest
             ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/bootstrap:${{ env.TAG }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false
