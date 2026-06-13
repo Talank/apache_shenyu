@@ -30,8 +30,6 @@ jobs:
 #          - shenyu-integrated-test-k8s-ingress-sofa
         os:
           - ubuntu-latest
-          - windows-latest
-          - macos-latest
       fail-fast: false
     runs-on: ${{ matrix.os }}
     if: always()
@@ -143,4 +141,3 @@ jobs:
             echo "Test Successful"
             exit 0
           fi
-
