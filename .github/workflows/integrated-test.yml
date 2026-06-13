@@ -42,12 +42,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     if: always()
     steps:
+      - name: Enable Git long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v3
         with:
           submodules: true
       # Copied from https://github.com/jens-maus/RaspberryMatic/blob/ea6b8ce0dd2d53ea88b2766ba8d7f8e1d667281f/.github/workflows/ci.yml#L34-L40
       # and https://github.com/actions/virtual-environments/issues/709#issuecomment-612569242
       - name: Free disk space
+        if: runner.os == 'Linux'
         run: |
           df --human-readable
           sudo apt clean
@@ -91,6 +95,7 @@ jobs:
 #        if: steps.filter.outputs.changed == 'true'
         run: bash ./shenyu-integrated-test/${{ matrix.case }}/script/healthcheck.sh
       - name: Disk space info
+        if: runner.os == 'Linux'
         run: |
           df --human-readable
       - name: Run test
