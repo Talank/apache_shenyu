@@ -22,18 +22,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     if: always()
     steps:
+      - name: Enable long paths on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v3
         with:
           submodules: true
       - name: Free disk space
         run: |
-          df --human-readable
+          df -h
           sudo apt clean
           for image in $(docker image ls --all --quiet); do
             docker rmi $image
           done
           rm --recursive --force "$AGENT_TOOLSDIRECTORY"
-          df --human-readable
+          df -h
 #      -
 #        uses: dorny/paths-filter@v2
 #        id: filter
