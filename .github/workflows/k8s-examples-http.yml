@@ -22,10 +22,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     if: always()
     steps:
+      - name: Enable long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
       - uses: actions/checkout@v3
         with:
           submodules: true
       - name: Free disk space
+        if: runner.os == 'Linux'
         run: |
           df --human-readable
           sudo apt clean
