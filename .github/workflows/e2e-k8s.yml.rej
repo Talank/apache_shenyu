@@ -1,0 +1,193 @@
+@@ -30,135 +30,187 @@
+     steps:
+       - uses: actions/checkout@v3
+         with:
+           submodules: true
+       - name: Free disk space
++        if: runner.os == 'Linux'
+         run: |
+           df --human-readable
+           sudo apt clean
+           for image in $(docker image ls --all --quiet); do
+             docker rmi $image
+           done
+           rm --recursive --force "$AGENT_TOOLSDIRECTORY"
+           df --human-readable
+ #      - uses: dorny/paths-filter@v2
+ #        id: filter
+ #        with:
+ #          filters: '.github/filters.yml'
+ #          list-files: json
+ 
+   build-docker-images:
+     needs: changes
+ #    if: ${{ needs.changes.outputs.e2e == 'true' }}
+     runs-on: ${{ matrix.os }}
+     steps:
++      - name: Enable Git long paths (Windows)
++        if: runner.os == 'Windows'
++        run: git config --global core.longpaths true
++
+       - uses: actions/checkout@v3
+         with:
+           submodules: true
+       - name: Free disk space
++        if: runner.os == 'Linux'
+         run: |
+           df --human-readable
+           sudo apt clean
+           for image in $(docker image ls --all --quiet); do
+             docker rmi $image
+           done
+           rm --recursive --force "$AGENT_TOOLSDIRECTORY"
+           df --human-readable
+ 
+       - name: Set up JDK 17 for Building ShenYu
+         uses: actions/setup-java@v4
+         with:
+           java-version: '17'
+           distribution: 'temurin'
+ 
+       - name: Build with Maven
+         run: ./mvnw -B clean install -Prelease,docker -Dmaven.javadoc.skip=true -B -Drat.skip=true 
+           -Dmaven.test.skip=true -Djacoco.skip=true -DskipITs -DskipTests package -T1C
+ 
+       - name: Save ShenYu Maven Repos
+         uses: actions/cache/save@v3
+         with:
+           path: ~/.m2/repository
+           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+           restore-keys: |
+             ${{ runner.os }}-maven-
+ 
+-      - name: Build Docker Image
++      - name: Build Docker Image (Linux/macOS)
++        if: runner.os != 'Windows'
+         run: |
+           docker save apache/shenyu-bootstrap:latest > /tmp/apache-shenyu-bootstrap.tar
+           docker save apache/shenyu-admin:latest > /tmp/apache-shenyu-admin.tar
+ 
++      - name: Build Docker Image (Windows)
++        if: runner.os == 'Windows'
++        shell: pwsh
++        run: |
++          docker save apache/shenyu-bootstrap:latest -o $env:RUNNER_TEMP\apache-shenyu-bootstrap.tar
++          docker save apache/shenyu-admin:latest -o $env:RUNNER_TEMP\apache-shenyu-admin.tar
++
+       - name: Upload Docker Image Artifacts
+         uses: actions/upload-artifact@v4
+         with:
+           name: shenyu-images
+-          path: /tmp/apache-shenyu-*.tar
++          path: |
++            /tmp/apache-shenyu-*.tar
++            ${{ runner.temp }}/apache-shenyu-*.tar
+           retention-days: 1
+ 
+     strategy:
+       matrix:
+         os: &id001
+           - ubuntu-latest
+           - windows-latest
+           - macos-latest
+       fail-fast: false
+   e2e-storage:
+     runs-on: ${{ matrix.os }}
+     needs:
+       - changes
+       - build-docker-images
+ #    if: (github.repository == 'apache/shenyu' && ${{ needs.changes.outputs.e2e == 'true' }})
+     if: always()
+     strategy:
+       matrix:
+         include:
+           - case: shenyu-e2e-case-storage
+             script: e2e-h2-compose
+           - case: shenyu-e2e-case-storage
+             script: e2e-mysql-compose
+           - case: shenyu-e2e-case-storage
+             script: e2e-postgres-compose
+           - case: shenyu-e2e-case-storage
+             script: e2e-opengauss-compose
+         os: *id001
+       fail-fast: false
+     steps:
++      - name: Enable Git long paths (Windows)
++        if: runner.os == 'Windows'
++        run: git config --global core.longpaths true
++
+       - uses: actions/checkout@v2
+         with:
+           submodules: true
+ 
+       - name: Free disk space
++        if: runner.os == 'Linux'
+         run: |
+           df --human-readable
+           sudo apt clean
+           for image in $(docker image ls --all --quiet); do
+             docker rmi $image
+           done
+           rm --recursive --force "$AGENT_TOOLSDIRECTORY"
+           df --human-readable
+           rm -rf /tmp/shenyu
+           mkdir -p /tmp/shenyu
+ 
++      - name: Prepare temp directory (Windows)
++        if: runner.os == 'Windows'
++        shell: pwsh
++        run: |
++          if (Test-Path "$env:RUNNER_TEMP\shenyu") { Remove-Item -Recurse -Force "$env:RUNNER_TEMP\shenyu" }
++          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP\shenyu" | Out-Null
++
++      - name: Prepare temp directory (macOS)
++        if: runner.os == 'macOS'
++        run: |
++          rm -rf /tmp/shenyu
++          mkdir -p /tmp/shenyu
++
+       - name: Set up JDK 17 for Building ShenYu
+         uses: actions/setup-java@v4
+         with:
+           java-version: '17'
+           distribution: 'temurin'
+ 
+       - name: Restore ShenYu Maven Repos
+         uses: actions/cache/restore@v3
+         with:
+           path: ~/.m2/repository
+           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+           restore-keys: |
+             ${{ runner.os }}-maven-
+ 
+-      - uses: actions/download-artifact@v4
++      - name: Download Docker Image Artifacts (Linux/macOS)
++        if: runner.os != 'Windows'
++        uses: actions/download-artifact@v4
+         with:
+           name: shenyu-images
+           path: /tmp/shenyu/
+ 
+-      - name: Load ShenYu Docker Images
++      - name: Download Docker Image Artifacts (Windows)
++        if: runner.os == 'Windows'
++        uses: actions/download-artifact@v4
++        with:
++          name: shenyu-images
++          path: ${{ runner.temp }}\shenyu\
++
++      - name: Load ShenYu Docker Images (Linux/macOS)
++        if: runner.os != 'Windows'
+         run: |
+           docker load --input /tmp/shenyu/apache-shenyu-admin.tar
+           docker load --input /tmp/shenyu/apache-shenyu-bootstrap.tar
+           docker image ls -a
++
++      - name: Load ShenYu Docker Images (Windows)
++        if: runner.os == 'Windows'
++        shell: pwsh
++        run: |
++          docker load --input "$env:RUNNER_TEMP\shenyu\apache-shenyu-admin.tar"
++          docker load --input "$env:RUNNER_TEMP\shenyu\apache-shenyu-bootstrap.tar"
++          docker image ls -a
+\ No newline at end of line
