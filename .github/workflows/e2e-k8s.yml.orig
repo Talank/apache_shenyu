@@ -43,7 +43,8 @@ jobs:
 
   build-docker-images:
     needs: changes
-    runs-on: ubuntu-latest
+#    if: ${{ needs.changes.outputs.e2e == 'true' }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -123,6 +124,7 @@ jobs:
             script: e2e-postgres-compose
           - case: shenyu-e2e-case-storage
             script: e2e-opengauss-compose
+        os: *id001
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -199,7 +201,7 @@ jobs:
 #          kubectl get events --all-namespaces
 
   e2e-case:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs:
       - changes
       - build-docker-images
@@ -229,6 +231,7 @@ jobs:
           - case: shenyu-e2e-case-logging-kafka
             script: e2e-logging-kafka-compose
 
+        os: *id001
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
