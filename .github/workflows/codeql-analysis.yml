@@ -16,25 +16,20 @@
 name: "CodeQL"
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - '**/*.java'
-  pull_request:
-    paths:
-      - '**/*.java'
-
+  workflow_dispatch:
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
-    if: (github.repository == 'apache/shenyu')
+    runs-on: ${{ matrix.os }}
+    if: always()
 
     strategy:
       fail-fast: false
       matrix:
         language: ['java']
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository

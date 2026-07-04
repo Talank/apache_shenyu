@@ -16,11 +16,7 @@
 name: it
 
 on:
-  pull_request:
-  push:
-    branches:
-      - master
-
+  workflow_dispatch:
 jobs:
   build:
     strategy:
@@ -38,8 +34,12 @@ jobs:
           - shenyu-integrated-test-combination
           - shenyu-integrated-test-sdk-apache-dubbo
           - shenyu-integrated-test-sdk-http
-    runs-on: ubuntu-latest
-    if: (github.repository == 'apache/shenyu')
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    if: always()
     steps:
       - uses: actions/checkout@v3
         with:
@@ -78,7 +78,8 @@ jobs:
         run: ./mvnw -B clean install -Prelease,docker -Dmaven.javadoc.skip=true -Dmaven.test.skip=true
       - name: Build examples
 #        if: steps.filter.outputs.changed == 'true'
-        run: ./mvnw -B clean install -Pexample -Dmaven.javadoc.skip=true -Dmaven.test.skip=true -am -f ./shenyu-examples/pom.xml
+        run: ./mvnw -B clean install -Pexample -Dmaven.javadoc.skip=true -Dmaven.test.skip=true -am -f 
+          ./shenyu-examples/pom.xml
       - name: Build integrated tests
 #        if: steps.filter.outputs.changed == 'true'
         run: ./mvnw -B clean install -Pit -DskipTests -f ./shenyu-integrated-test/pom.xml
@@ -98,7 +99,7 @@ jobs:
         continue-on-error: true
       - name: Check test result
 #        if: steps.filter.outputs.changed == 'true'
-        run: |
+        run: |-
           docker compose -f ./shenyu-integrated-test/${{ matrix.case }}/docker-compose.yml logs --tail="all"
           if [[ ${{steps.test.outcome}} == "failure" ]]; then
             echo "Test Failed"

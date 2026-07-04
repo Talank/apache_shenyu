@@ -16,11 +16,7 @@
 name: e2e
 
 on:
-  pull_request:
-  push:
-    branches:
-      - master
-
+  workflow_dispatch:
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -48,7 +44,7 @@ jobs:
   build-docker-images:
     needs: changes
 #    if: ${{ needs.changes.outputs.e2e == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -70,7 +66,8 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Maven
-        run: ./mvnw -B clean install -Prelease,docker -Dmaven.javadoc.skip=true -B -Drat.skip=true -Dmaven.test.skip=true -Djacoco.skip=true -DskipITs -DskipTests package -T1C
+        run: ./mvnw -B clean install -Prelease,docker -Dmaven.javadoc.skip=true -B -Drat.skip=true 
+          -Dmaven.test.skip=true -Djacoco.skip=true -DskipITs -DskipTests package -T1C
 
       - name: Save ShenYu Maven Repos
         uses: actions/cache/save@v3
@@ -102,13 +99,19 @@ jobs:
           path: /tmp/apache-shenyu-*.tar
           retention-days: 1
 
+    strategy:
+      matrix:
+        os: &id001
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
   e2e-storage:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs:
       - changes
       - build-docker-images
 #    if: (github.repository == 'apache/shenyu' && ${{ needs.changes.outputs.e2e == 'true' }})
-    if: (github.repository == 'apache/shenyu')
+    if: always()
     strategy:
       matrix:
         include:
@@ -120,6 +123,8 @@ jobs:
             script: e2e-postgres-compose
           - case: shenyu-e2e-case-storage
             script: e2e-opengauss-compose
+        os: *id001
+      fail-fast: false
     steps:
       - uses: actions/checkout@v2
         with:
@@ -170,7 +175,7 @@ jobs:
         with:
           name: shenyu-images
           path: /tmp/shenyu/
-      
+
       - name: Load ShenYu Docker Images
         run: |
           docker load --input /tmp/shenyu/apache-shenyu-admin.tar
@@ -195,12 +200,12 @@ jobs:
 #          kubectl get events --all-namespaces
 
   e2e-case:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs:
       - changes
       - build-docker-images
 #    if: (github.repository == 'apache/shenyu' && ${{ needs.changes.outputs.e2e == 'true' }})
-    if: (github.repository == 'apache/shenyu')
+    if: always()
     strategy:
       matrix:
         include:
@@ -224,7 +229,9 @@ jobs:
             script: e2e-logging-rocketmq-compose
           - case: shenyu-e2e-case-logging-kafka
             script: e2e-logging-kafka-compose
-            
+
+        os: *id001
+      fail-fast: false
     steps:
       - uses: actions/checkout@v2
         with:
@@ -270,7 +277,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      
+
       - uses: actions/download-artifact@v4
         with:
           name: shenyu-images
@@ -285,7 +292,8 @@ jobs:
 #            ${{ runner.os }}-e2e-maven-
 
       - name: Build examples with Maven
-        run: ./mvnw -B clean install -Pexample -Dmaven.javadoc.skip=true -Dmaven.test.skip=true -am -f ./shenyu-examples/pom.xml
+        run: ./mvnw -B clean install -Pexample -Dmaven.javadoc.skip=true -Dmaven.test.skip=true -am -f 
+          ./shenyu-examples/pom.xml
 
       - uses: actions/download-artifact@v4
         with:
